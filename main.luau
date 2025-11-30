@@ -5,58 +5,43 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
-local CoreGui = not RunService:IsStudio() and game:GetService("CoreGui")
+local CoreGui = game:GetService("CoreGui")
 
--- [LUCIDE ICONS SYSTEM] -------------------------------------------------------
+-- [LUCIDE ICONS LOADER]
 local Icons = nil
-local ICONS_URL = 'https://raw.githubusercontent.com/latte-soft/lucide-roblox/refs/heads/master/lib/Icons.luau'
+local ICONS_URL = 'https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua'
 
--- Tải Icons (Chạy nền để không lag game)
 task.spawn(function()
-	local success, result = pcall(function()
-		return game:HttpGet(ICONS_URL)
-	end)
-	if success then
-		local loadFunc = loadstring(result)
-		if loadFunc then Icons = loadFunc() end
-	else
-		warn("Library: Failed to load Lucide Icons.")
-	end
+    pcall(function()
+        local Response = game:HttpGet(ICONS_URL)
+        local Func = loadstring(Response)
+        if Func then Icons = Func() end
+    end)
 end)
 
-local function getIcon(name)
-	if not Icons then return nil end
-	if type(name) ~= "string" then return nil end
-	
-	name = string.match(string.lower(name), "^%s*(.*)%s*$")
-	local sizedicons = Icons['48px'] -- Sử dụng size chuẩn 48px
-	if not sizedicons then return nil end
-
-	local r = sizedicons[name]
-	if not r then return nil end
-
-	local rirs = r[2] -- ImageRectSize
-	local riro = r[3] -- ImageRectOffset
-
-	return {
-		id = r[1],
-		imageRectSize = Vector2.new(rirs[1], rirs[2]),
-		imageRectOffset = Vector2.new(riro[1], riro[2])
-	}
+local function GetIcon(Name)
+    if not Icons then return nil end
+    if type(Name) ~= "string" then return nil end
+    local Name = string.lower(Name)
+    local IconData = Icons['48px'][Name]
+    if not IconData then return nil end
+    
+    return {
+        ID = "rbxassetid://" .. IconData[1],
+        RectSize = Vector2.new(IconData[2][1], IconData[2][2]),
+        RectOffset = Vector2.new(IconData[3][1], IconData[3][2])
+    }
 end
+
 
 function Library:SetImage(instance, iconNameOrId)
 	if not instance then return end
-	
-	-- Thử lấy Lucide Icon
-	local lucide = getIcon(iconNameOrId)
-	
+	local lucide = GetIcon(Name)
 	if lucide then
 		instance.Image = "rbxassetid://" .. lucide.id
 		instance.ImageRectSize = lucide.imageRectSize
 		instance.ImageRectOffset = lucide.imageRectOffset
 	else
-		-- Nếu không phải Lucide, dùng logic cũ
 		instance.Image = Library:Asset(iconNameOrId)
 		instance.ImageRectSize = Vector2.new(0, 0)
 		instance.ImageRectOffset = Vector2.new(0, 0)
@@ -66,22 +51,9 @@ end
 
 local Signal = {} do
 	Signal.__index = Signal
-
-	function Signal.new()
-		return setmetatable({
-			Connections = {}
-		}, Signal)
-	end
-
-	function Signal:Connect(func)
-		table.insert(self.Connections, func)
-	end
-
-	function Signal:Fire(...)
-		for _, func in ipairs(self.Connections) do
-			task.spawn(func, ...)
-		end
-	end
+	function Signal.new() return setmetatable({Connections = {}}, Signal) end
+	function Signal:Connect(func) table.insert(self.Connections, func) end
+	function Signal:Fire(...) for _, func in ipairs(self.Connections) do task.spawn(func, ...) end end
 end
 
 Library.string_crypt = (function(length)
@@ -98,19 +70,13 @@ end)
 Library.Window_crypt = Library.string_crypt(32)
 
 Library.SafeParent = (function()
-	if RunService:IsStudio() then
-		return Players.LocalPlayer.PlayerGui
-	end
-	if gethui then
-		return gethui()
-	end
+	if RunService:IsStudio() then return Players.LocalPlayer.PlayerGui end
+	if gethui then return gethui() end
 	return CoreGui
 end)()
 
 Library.IsMobile = (function()
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		return true
-	end
+	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then return true end
 	return false
 end)()
 
@@ -141,8 +107,7 @@ function Library:Draggable(inputframe, dragframe)
 	local startPos = nil
 
 	inputframe.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 
-			or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragStart = UserInputService:GetMouseLocation()
@@ -151,16 +116,13 @@ function Library:Draggable(inputframe, dragframe)
 			end
 			startPos = dragframe.Position
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
 			end)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement 
-			or input.UserInputType == Enum.UserInputType.Touch) then
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local currentPos
 			if input.UserInputType == Enum.UserInputType.MouseMovement then
 				currentPos = UserInputService:GetMouseLocation()
@@ -168,13 +130,43 @@ function Library:Draggable(inputframe, dragframe)
 				currentPos = input.Position
 			end
 			local delta = currentPos - dragStart
-			dragframe.Position = UDim2.new(
-				startPos.X.Scale,
-				startPos.X.Offset + delta.X,
-				startPos.Y.Scale,
-				startPos.Y.Offset + delta.Y
-			)
+			dragframe.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 		end
+	end)
+end
+
+function Library:SimpleDraggable(a)
+	local Dragging = nil
+	local DragInput = nil
+	local DragStart = nil
+	local StartPosition = nil
+
+	local function Update(input)
+		local Delta = input.Position - DragStart
+		local pos = UDim2.new(StartPosition.X.Scale, StartPosition.X.Offset + Delta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + Delta.Y)
+		local Tween = TweenService:Create(a, TweenInfo.new(0.3), {Position = pos})
+		Tween:Play()
+	end
+
+	a.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			Dragging = true
+			DragStart = input.Position
+			StartPosition = a.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then Dragging = false end
+			end)
+		end
+	end)
+
+	a.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			DragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == DragInput and Dragging then Update(input) end
 	end)
 end
 
@@ -184,9 +176,7 @@ function Library:Effect(c, p)
 	local relativeX = Mouse.X - c.AbsolutePosition.X
 	local relativeY = Mouse.Y - c.AbsolutePosition.Y
 
-	if relativeX < 0 or relativeY < 0 or relativeX > c.AbsoluteSize.X or relativeY > c.AbsoluteSize.Y then
-		return
-	end
+	if relativeX < 0 or relativeY < 0 or relativeX > c.AbsoluteSize.X or relativeY > c.AbsoluteSize.Y then return end
 
 	local ClickButtonCircle = Instance.new("Frame")
 	ClickButtonCircle.Parent = p
@@ -203,14 +193,10 @@ function Library:Effect(c, p)
 	UICorner.Parent = ClickButtonCircle
 
 	local tweenInfo = TweenInfo.new(2.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	local goal = {
-		Size = UDim2.new(0, c.AbsoluteSize.X * 1.5, 0, c.AbsoluteSize.X * 1.5),
-		BackgroundTransparency = 1
-	}
+	local goal = {Size = UDim2.new(0, c.AbsoluteSize.X * 1.5, 0, c.AbsoluteSize.X * 1.5), BackgroundTransparency = 1}
 	local expandTween = TweenService:Create(ClickButtonCircle, tweenInfo, goal)
-	expandTween.Completed:Connect(function()
-		ClickButtonCircle:Destroy()
-	end)
+
+	expandTween.Completed:Connect(function() ClickButtonCircle:Destroy() end)
 	expandTween:Play()
 end
 
@@ -223,40 +209,29 @@ function Library:Resize(inputframe, frametoresize, minSize, maxSize, speed)
 	speed   = speed or 1.5
 
 	inputframe.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 
-			or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			resizing = true
 			resizeStart = input.Position
 			startSize = frametoresize.Size
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					resizing = false
-				end
+				if input.UserInputState == Enum.UserInputState.End then resizing = false end
 			end)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement 
-			or input.UserInputType == Enum.UserInputType.Touch) then
+		if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local delta = (input.Position - resizeStart) * speed
 			local newX = math.clamp(startSize.X.Offset + delta.X, minSize.X, maxSize.X)
 			local newY = math.clamp(startSize.Y.Offset + delta.Y, minSize.Y, maxSize.Y)
-			frametoresize.Size = UDim2.new(
-				startSize.X.Scale, newX,
-				startSize.Y.Scale, newY
-			)
+			frametoresize.Size = UDim2.new(startSize.X.Scale, newX, startSize.Y.Scale, newY)
 		end
 	end)
 end
 
 function Library:Asset(rbx)
-	if typeof(rbx) == 'number' then
-		return "rbxassetid://" .. rbx
-	end
-	if typeof(rbx) == 'string' and rbx:find('rbxassetid://') then
-		return rbx
-	end
+	if typeof(rbx) == 'number' then return "rbxassetid://" .. rbx end
+	if typeof(rbx) == 'string' and rbx:find('rbxassetid://') then return rbx end
 	return rbx
 end
 
@@ -296,7 +271,7 @@ function Library:Row(Parent, Title, Desc, Size, Icon, IconSize)
 	PaddingFrame_1.Position = UDim2.new(0.5, 0,0.5, 0)
 	PaddingFrame_1.Size = UDim2.new(1, 0,1, 0)
 
-    -- [ĐÃ SỬA] Luôn dùng Padding 12 vì không còn Icon
+    -- [ĐÃ SỬA] Luôn dùng padding nhỏ (12) vì không có icon
 	local PaddingOffset = 12 
 
 	UIPadding_1.Parent = PaddingFrame_1
@@ -366,7 +341,7 @@ function Library:Row(Parent, Title, Desc, Size, Icon, IconSize)
 		Desc_1.TextYAlignment = Enum.TextYAlignment.Top
 	end
 
-    -- [ĐÃ SỬA] Không còn phần tạo AssetFrame (Icon) ở đây nữa
+
 
 	UIListLayout_1:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		Rows.Size = UDim2.new(1, 0, 0, UIListLayout_1.AbsoluteContentSize.Y + 25)
@@ -383,7 +358,7 @@ function Library:CreateWindow(params)
 	local Title = params.Title or "Visual Studio Code - Library"
 	local Footer = params.Footer or "Network Constant"
 	local Enums = params.Enums or Enum.KeyCode.F1
-	local StartSize = params.Size or Vector2.new(500,360)
+	local StartSize = params.Size or Vector2.new(500,500)
 	local MinSize = params.MinSize or Vector2.new(500, 350)
 	local MaxSize = params.MaxSize or Vector2.new(850, 600)
 
@@ -426,32 +401,18 @@ function Library:CreateWindow(params)
 
 		local function closeopenui()
 			Main_1:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), "Out", "Sine", 0.1, true)
-			Library:Tween({
-				v = Toggle,
-				t = 0.2,
-				s = "Back",
-				d = "Out",
-				g = {ImageTransparency = 0.3}
-			}):Play()
+			Library:Tween({v = Toggle, t = 0.2, s = "Back", d = "Out", g = {ImageTransparency = 0.3}}):Play()
 			delay(0.1, function()
-				Library:Tween({
-					v = Toggle,
-					t = 0.2,
-					s = "Back",
-					d = "Out",
-					g = {ImageTransparency = 0.7}
-				}):Play()
+				Library:Tween({v = Toggle, t = 0.2, s = "Back", d = "Out", g = {ImageTransparency = 0.7}}):Play()
 			end)
 			Main_1.Visible = not Main_1.Visible
 		end
 
 		local On = true
-
 		Input_1.MouseButton1Click:Connect(function()
 			closeopenui()
 			On = not On
 		end)
-
 		UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			if not gameProcessed and input.KeyCode == Enums then
 				closeopenui()
@@ -514,7 +475,7 @@ function Library:CreateWindow(params)
 	UICorner_1.Parent = Background_1
 	UICorner_1.CornerRadius = UDim.new(0,5)
 
-	-- [Header Setup...] (Giữ nguyên phần Header)
+	-- Header
 	local Header = Instance.new("Frame")
 	local UICorner_1 = Instance.new("UICorner")
 	local Squire_1 = Instance.new("Frame")
@@ -588,35 +549,6 @@ function Library:CreateWindow(params)
 	Light_1.Position = UDim2.new(0, 0,0.5, 0)
 	Light_1.Size = UDim2.new(0, 45,0, 20)
 
-	Red_1.Name = "Red"
-	Red_1.Parent = Light_1
-	Red_1.BackgroundColor3 = Color3.fromRGB(254,93,86)
-	Red_1.BorderColor3 = Color3.fromRGB(0,0,0)
-	Red_1.BorderSizePixel = 0
-	Red_1.Size = UDim2.new(0, 6,0, 6)
-
-	UICorner_2.Parent = Red_1
-	UICorner_2.CornerRadius = UDim.new(1,0)
-
-	Yellow_1.Name = "Yellow"
-	Yellow_1.Parent = Light_1
-	Yellow_1.BackgroundColor3 = Color3.fromRGB(255,187,46)
-	Yellow_1.BorderColor3 = Color3.fromRGB(0,0,0)
-	Yellow_1.BorderSizePixel = 0
-	Yellow_1.Size = UDim2.new(0, 6,0, 6)
-
-	UICorner_3.Parent = Yellow_1
-	UICorner_3.CornerRadius = UDim.new(1,0)
-
-	Green_1.Name = "Green"
-	Green_1.Parent = Light_1
-	Green_1.BackgroundColor3 = Color3.fromRGB(56,193,76)
-	Green_1.BorderColor3 = Color3.fromRGB(0,0,0)
-	Green_1.BorderSizePixel = 0
-	Green_1.Size = UDim2.new(0, 6,0, 6)
-
-	UICorner_4.Parent = Green_1
-	UICorner_4.CornerRadius = UDim.new(1,0)
 
 	UIListLayout_1.Parent = Light_1
 	UIListLayout_1.Padding = UDim.new(0,5)
@@ -685,82 +617,41 @@ function Library:CreateWindow(params)
 				Max_1.Image = "rbxassetid://99249999535639"
 				Max_1.ImageTransparency = 0.5
 			end
-
 			local LastSize = Main_1.Size
 			local Threshold = 100
-
 			local function Maxs(value)
 				if value then
 					if Main_1.Size.Y.Offset ~= MaxSize.Y then
-						local MaxY = Library:Tween({
-							v = Main_1,
-							t = 0.2,
-							s = "Exponential",
-							d = "Out",
-							g = {Size = UDim2.new(0, Main_1.Size.X.Offset, 0, MaxSize.Y)}
-						})
-						MaxY:Play()
-						MaxY.Completed:Wait()
+						local MaxY = Library:Tween({v = Main_1, t = 0.2, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, Main_1.Size.X.Offset, 0, MaxSize.Y)}})
+						MaxY:Play(); MaxY.Completed:Wait()
 					end
 					if Main_1.Size.X.Offset ~= MaxSize.X then
-						Library:Tween({
-							v = Main_1,
-							t = 0.2,
-							s = "Exponential",
-							d = "Out",
-							g = {Size = UDim2.new(0, MaxSize.X, 0, Main_1.Size.Y.Offset)}
-						}):Play()
+						Library:Tween({v = Main_1, t = 0.2, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, MaxSize.X, 0, Main_1.Size.Y.Offset)}}):Play()
 					end
 				else
 					if Main_1.Size.X.Offset ~= MinSize.X then
-						local MinX = Library:Tween({
-							v = Main_1,
-							t = 0.2,
-							s = "Exponential",
-							d = "Out",
-							g = {Size = UDim2.new(0, MinSize.X, 0, Main_1.Size.Y.Offset)}
-						})
-						MinX:Play()
-						MinX.Completed:Wait()
+						local MinX = Library:Tween({v = Main_1, t = 0.2, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, MinSize.X, 0, Main_1.Size.Y.Offset)}})
+						MinX:Play(); MinX.Completed:Wait()
 					end
 					if Main_1.Size.Y.Offset ~= MinSize.Y then
-						Library:Tween({
-							v = Main_1,
-							t = 0.2,
-							s = "Exponential",
-							d = "Out",
-							g = {Size = UDim2.new(0, Main_1.Size.X.Offset, 0, MinSize.Y)}
-						}):Play()
+						Library:Tween({v = Main_1, t = 0.2, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, Main_1.Size.X.Offset, 0, MinSize.Y)}}):Play()
 					end
 				end
 			end
-
 			MaxButton.MouseButton1Click:Connect(function()
 				LastSize = Main_1.Size
-				local curX = LastSize.X.Offset
-				local curY = LastSize.Y.Offset
+				local curX = LastSize.X.Offset; local curY = LastSize.Y.Offset
 				local distanceToMin = math.sqrt((curX - MinSize.X)^2 + (curY - MinSize.Y)^2)
 				local distanceToMax = math.sqrt((curX - MaxSize.X)^2 + (curY - MaxSize.Y)^2)
-				if distanceToMin <= Threshold then
-					Maxs(true)
-				elseif distanceToMax <= Threshold then
-					Maxs(false)
-				else
-					Maxs(true)
-				end
+				if distanceToMin <= Threshold then Maxs(true) elseif distanceToMax <= Threshold then Maxs(false) else Maxs(true) end
 			end)
-
 			local DestroyButton = Library:Button(Destroy_1)
-			DestroyButton.MouseButton1Click:Connect(function()
-				VSCODE:Destroy()
-			end)
+			DestroyButton.MouseButton1Click:Connect(function() VSCODE:Destroy() end)
 		end
 	end
 
 	local HideButton = Library:Button(Hide_1)
-	HideButton.MouseButton1Click:Connect(function()
-		Main_1.Visible = false
-	end)
+	HideButton.MouseButton1Click:Connect(function() Main_1.Visible = false end)
 
 	local Lower = Instance.new("Frame")
 	local UICorner_1 = Instance.new("UICorner")
@@ -813,7 +704,7 @@ function Library:CreateWindow(params)
 	Title_Lower_1.BackgroundTransparency = 1
 	Title_Lower_1.BorderColor3 = Color3.fromRGB(0,0,0)
 	Title_Lower_1.BorderSizePixel = 0
-	Title_Lower_1.Position = UDim2.new(0, 0,0.5, 0)
+	Title_Lower_1.Position = UDim2.new(0, 0.05, 0)
 	Title_Lower_1.Size = UDim2.new(0, 200,0, 5)
 	Title_Lower_1.Font = Enum.Font.GothamMedium
 	Title_Lower_1.Text = Footer
@@ -840,7 +731,6 @@ function Library:CreateWindow(params)
 	_2_1.BorderColor3 = Color3.fromRGB(0,0,0)
 	_2_1.BorderSizePixel = 0
 	_2_1.Size = UDim2.new(0, 6,0, 6)
-
 	UICorner_2.Parent = _2_1
 	UICorner_2.CornerRadius = UDim.new(1,0)
 
@@ -850,7 +740,6 @@ function Library:CreateWindow(params)
 	_3_1.BorderColor3 = Color3.fromRGB(0,0,0)
 	_3_1.BorderSizePixel = 0
 	_3_1.Size = UDim2.new(0, 6,0, 6)
-
 	UICorner_3.Parent = _3_1
 	UICorner_3.CornerRadius = UDim.new(1,0)
 
@@ -860,7 +749,6 @@ function Library:CreateWindow(params)
 	_1_1.BorderColor3 = Color3.fromRGB(0,0,0)
 	_1_1.BorderSizePixel = 0
 	_1_1.Size = UDim2.new(0, 6,0, 6)
-
 	UICorner_4.Parent = _1_1
 	UICorner_4.CornerRadius = UDim.new(1,0)
 
@@ -1024,13 +912,9 @@ function Library:CreateWindow(params)
 	UIPadding_1.PaddingLeft = UDim.new(0,45)
 	UIPadding_1.PaddingTop = UDim.new(0,20)
 
-	local Tabs = {
-		Value = false
-	}
+	local Tabs = { Value = false }
 
 	function Tabs:AddTab(Title, Icons)
-		-- [HÀM THÊM TAB] -------------------
-		
 		local AddTab = Instance.new("Frame")
 		local Transparent_1 = Instance.new("Frame")
 		local UICorner_1 = Instance.new("UICorner")
@@ -1068,9 +952,8 @@ function Library:CreateWindow(params)
 		Icon_1.Position = UDim2.new(0.5, 0,0.5, 0)
 		Icon_1.Size = UDim2.new(0.5, 0,0.5, 0)
 		
-		-- [SỬA] Sử dụng Library:SetImage để hỗ trợ Lucide Icon
+		-- [FIX] Hỗ trợ Lucide Icon cho Tab
 		Library:SetImage(Icon_1, Icons)
-		
 		Icon_1.ImageTransparency = 0.5
 
 		Line_1.Name = "Line"
@@ -1152,94 +1035,34 @@ function Library:CreateWindow(params)
 
 		local function OnSelectPage()
 			for _, v in pairs(Page_1:GetChildren()) do
-				if v.Name == 'AddPage' or v.Name == 'AddDropdown' then
-					v.Visible = false
-				end
+				if v.Name == 'AddPage' or v.Name == 'AddDropdown' then v.Visible = false end
 			end
-
 			for _, v in pairs(Scrolling_1:GetChildren()) do
 				if v.Name == 'AddTab' then
-					Library:Tween({
-						v = v.Transparent,
-						t = 0.15,
-						s = "Exponential",
-						d = "Out",
-						g = {BackgroundTransparency = 1}
-					}):Play()
-					Library:Tween({
-						v = v.Transparent.Icon,
-						t = 0.15,
-						s = "Exponential",
-						d = "Out",
-						g = {ImageTransparency = 0.5}
-					}):Play()
-					Library:Tween({
-						v = v.Line,
-						t = 0.15,
-						s = "Exponential",
-						d = "Out",
-						g = {BackgroundTransparency = 1}
-					}):Play()
+					Library:Tween({v = v.Transparent, t = 0.15, s = "Exponential", d = "Out", g = {BackgroundTransparency = 1}}):Play()
+					Library:Tween({v = v.Transparent.Icon, t = 0.15, s = "Exponential", d = "Out", g = {ImageTransparency = 0.5}}):Play()
+					Library:Tween({v = v.Line, t = 0.15, s = "Exponential", d = "Out", g = {BackgroundTransparency = 1}}):Play()
 				end
 			end
-
 			AddPage.Visible = true
 			UIPageLayout_1:JumpTo(AddPage)
-			Library:Tween({
-				v = Transparent_1,
-				t = 0.15,
-				s = "Exponential",
-				d = "Out",
-				g = {BackgroundTransparency = 0}
-			}):Play()
-			Library:Tween({
-				v = Icon_1,
-				t = 0.15,
-				s = "Exponential",
-				d = "Out",
-				g = {ImageTransparency = 0}
-			}):Play()
-			Library:Tween({
-				v = Line_1,
-				t = 0.15,
-				s = "Exponential",
-				d = "Out",
-				g = {BackgroundTransparency = 0}
-			}):Play()
+			Library:Tween({v = Transparent_1, t = 0.15, s = "Exponential", d = "Out", g = {BackgroundTransparency = 0}}):Play()
+			Library:Tween({v = Icon_1, t = 0.15, s = "Exponential", d = "Out", g = {ImageTransparency = 0}}):Play()
+			Library:Tween({v = Line_1, t = 0.15, s = "Exponential", d = "Out", g = {BackgroundTransparency = 0}}):Play()
 		end
 
 		if not Tabs.Value then
 			Tabs.Value = true
 			AddPage.Visible = true
 			UIPageLayout_1:JumpTo(AddPage)
-			Library:Tween({
-				v = Transparent_1,
-				t = 0.3,
-				s = "Exponential",
-				d = "Out",
-				g = {BackgroundTransparency = 0}
-			}):Play()
-			Library:Tween({
-				v = Icon_1,
-				t = 0.3,
-				s = "Exponential",
-				d = "Out",
-				g = {ImageTransparency = 0}
-			}):Play()
-			Library:Tween({
-				v = Line_1,
-				t = 0.3,
-				s = "Exponential",
-				d = "Out",
-				g = {BackgroundTransparency = 0}
-			}):Play()
+			Library:Tween({v = Transparent_1, t = 0.3, s = "Exponential", d = "Out", g = {BackgroundTransparency = 0}}):Play()
+			Library:Tween({v = Icon_1, t = 0.3, s = "Exponential", d = "Out", g = {ImageTransparency = 0}}):Play()
+			Library:Tween({v = Line_1, t = 0.3, s = "Exponential", d = "Out", g = {BackgroundTransparency = 0}}):Play()
 		end
 
 		ButtonAddTab.MouseButton1Click:Connect(OnSelectPage)
 
-		local Element = {
-			Value = false
-		}
+		local Element = { Value = false }
 
 		function Element:CreateElement(Title, Descss)
 			local AddElement = Instance.new("Frame")
@@ -1325,61 +1148,26 @@ function Library:CreateWindow(params)
 
 			local function Select()
 				for _, v in pairs(PageList_1:GetChildren()) do
-					if v:IsA("Frame") then
-						v.Position = UDim2.new(0.6, 0, 0.5, 0)
-						v.Visible = false
-					end
+					if v:IsA("Frame") then v.Position = UDim2.new(0.6, 0, 0.5, 0); v.Visible = false end
 				end
-
 				for _, v in pairs(HeadScrolling_1:GetChildren()) do
 					if v:IsA("Frame") then
 						v.BackgroundColor3 = Color3.fromRGB(37,37,38)
-						Library:Tween({
-							v = v.Title,
-							t = 0.15,
-							s = "Exponential",
-							d = "Out",
-							g = {TextTransparency = 0.5}
-						}):Play()
+						Library:Tween({v = v.Title, t = 0.15, s = "Exponential", d = "Out", g = {TextTransparency = 0.5}}):Play()
 					end
 				end
-
 				MainPages_1.Visible = true
-				Library:Tween({
-					v = MainPages_1,
-					t = 0.3,
-					s = "Exponential",
-					d = "Out",
-					g = {Position = UDim2.new(0.5, 0, 0.5, 0)}
-				}):Play()
+				Library:Tween({v = MainPages_1, t = 0.3, s = "Exponential", d = "Out", g = {Position = UDim2.new(0.5, 0, 0.5, 0)}}):Play()
 				AddElement.BackgroundColor3 = Color3.fromRGB(5,120,200)
-				Library:Tween({
-					v = Title_1,
-					t = 0.15,
-					s = "Exponential",
-					d = "Out",
-					g = {TextTransparency = 0}
-				}):Play()
+				Library:Tween({v = Title_1, t = 0.15, s = "Exponential", d = "Out", g = {TextTransparency = 0}}):Play()
 			end
 
 			if not Element.Value then
 				Element.Value = true
 				MainPages_1.Visible = true
-				Library:Tween({
-					v = MainPages_1,
-					t = 0.3,
-					s = "Exponential",
-					d = "Out",
-					g = {Position = UDim2.new(0.5, 0, 0.5, 0)}
-				}):Play()
+				Library:Tween({v = MainPages_1, t = 0.3, s = "Exponential", d = "Out", g = {Position = UDim2.new(0.5, 0, 0.5, 0)}}):Play()
 				AddElement.BackgroundColor3 = Color3.fromRGB(5,120,200)
-				Library:Tween({
-					v = Title_1,
-					t = 0.15,
-					s = "Exponential",
-					d = "Out",
-					g = {TextTransparency = 0}
-				}):Play()
+				Library:Tween({v = Title_1, t = 0.15, s = "Exponential", d = "Out", g = {TextTransparency = 0}}):Play()
 			end
 
 			ButtonAddElement.MouseButton1Click:Connect(Select)
@@ -1405,10 +1193,7 @@ function Library:CreateWindow(params)
 				UIListLayout_1z.Padding = UDim.new(0,1)
 				UIListLayout_1z.SortOrder = Enum.SortOrder.LayoutOrder
 
-				Title_1.Changed:Connect(function()
-					Title_1.Size = UDim2.new(1, 0,0, Title_1.TextBounds.Y)
-				end)
-
+				Title_1.Changed:Connect(function() Title_1.Size = UDim2.new(1, 0,0, Title_1.TextBounds.Y) end)
 				Title_1.Name = "Title"
 				Title_1.Parent = PageTitle
 				Title_1.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -1427,10 +1212,7 @@ function Library:CreateWindow(params)
 
 				local Desc_1 = Descss and Instance.new("TextLabel") or nil do
 					if Descss then
-						Desc_1.Changed:Connect(function()
-							Desc_1.Size = UDim2.new(1, 0,0, Desc_1.TextBounds.Y)
-						end)
-
+						Desc_1.Changed:Connect(function() Desc_1.Size = UDim2.new(1, 0,0, Desc_1.TextBounds.Y) end)
 						Desc_1.Name = "Desc"
 						Desc_1.Parent = PageTitle
 						Desc_1.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -1454,7 +1236,7 @@ function Library:CreateWindow(params)
 			function Class:Paragarp(params)
 				local Title = params.Title or "Unknow"
 				local Desc = params.Desc or nil
-				-- [SỬA] Loại bỏ tham số Icon
+				-- [MODIFIED] No Icon
 				local StatusValue = params.Status or "None"
 				local Rower = nil
 
@@ -1472,11 +1254,7 @@ function Library:CreateWindow(params)
 				local LightCircle_1 = Instance.new("ImageLabel")
 
 				Statust.Name = "Status"
-				if StatusValue ~= "None" then
-					StatusValue = true
-				else
-					StatusValue = false
-				end
+				if StatusValue ~= "None" then StatusValue = true else StatusValue = false end
 
 				Statust.Parent = Rower
 				Statust.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -1524,14 +1302,10 @@ function Library:CreateWindow(params)
 
 				selfs:SetStatus(StatusValue)
 				local Titles = Rower.Text.Title
-				function selfs:SetTitle(a)
-					Titles.Text = a
-				end
+				function selfs:SetTitle(a) Titles.Text = a end
 				if Desc then
 					local Descs = Rower.Text.Desc
-					function selfs:SetDesc(a)
-						Descs.Text = a
-					end
+					function selfs:SetDesc(a) Descs.Text = a end
 				end
 				return selfs
 			end
@@ -1539,11 +1313,11 @@ function Library:CreateWindow(params)
 			function Class:CreateToggle(new)
 				local Title = new.Title
 				local Desc = new.Desc or nil
-				-- [SỬA] Xóa Icon
+				-- [MODIFIED] No Icon passed to Row
 				local Raw = Library:Row(ScrollingPAGE_1, Title, Desc, 0.9, nil, nil)
 				local Button = Library:Button(Raw.Parent)
-				local Value = new.Default or false -- Đã sửa từ new.Value thành new.Default cho khớp ví dụ
-				local Callback = new.Callback or function() return end -- Đã sửa từ new.Call thành new.Callback
+				local Value = new.Default or false
+				local Callback = new.Callback or function() return end
 				local selfs = {}
 
 				local ElementSignal = Signal.new()
@@ -1580,37 +1354,23 @@ function Library:CreateWindow(params)
 
 				local function OnChanged(value)
 					for _, v in pairs(Main_1:GetChildren()) do
-						if v.Name == "Dropdown" and v.Visible then
-							return
-						end
+						if v.Name == "Dropdown" and v.Visible then return end
 					end
 					Library:Effect(Button, Raw)
 					if not value then 
 						Callback(value)
-						Library:Tween({
-							v = Circle_1, t = 0.1, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, 15,0, 8)}
-						}):Play()
+						Library:Tween({v = Circle_1, t = 0.1, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, 15,0, 8)}}):Play()
 						Vanity.BackgroundColor3 = Color3.fromRGB(67,67,69)
-						Library:Tween({
-							v = Circle_1, t = 0.25, s = "Back", d = "Out", g = {Position = UDim2.new(0.3, 0,0.5, 0)}
-						}):Play()
+						Library:Tween({v = Circle_1, t = 0.25, s = "Back", d = "Out", g = {Position = UDim2.new(0.3, 0,0.5, 0)}}):Play()
 						delay(0.05, function()
-							Library:Tween({
-								v = Circle_1, t = 0.1, s = "Bounce", d = "Out", g = {Size = UDim2.new(0, 15,0, 15)}
-							}):Play()
+							Library:Tween({v = Circle_1, t = 0.1, s = "Bounce", d = "Out", g = {Size = UDim2.new(0, 15,0, 15)}}):Play()
 						end)
 					elseif value then 
 						Callback(value)
-						Library:Tween({
-							v = Circle_1, t = 0.1, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, 15,0, 8)}
-						}):Play()
-						Library:Tween({
-							v = Circle_1, t = 0.1, s = "Linear", d = "Out", g = {Position = UDim2.new(0.7, 0,0.5, 0)}
-						}):Play()
+						Library:Tween({v = Circle_1, t = 0.1, s = "Exponential", d = "Out", g = {Size = UDim2.new(0, 15,0, 8)}}):Play()
+						Library:Tween({v = Circle_1, t = 0.1, s = "Linear", d = "Out", g = {Position = UDim2.new(0.7, 0,0.5, 0)}}):Play()
 						delay(0.05, function()
-							Library:Tween({
-								v = Circle_1, t = 0.1, s = "Bounce", d = "Out", g = {Size = UDim2.new(0, 15,0, 15)}
-							}):Play()
+							Library:Tween({v = Circle_1, t = 0.1, s = "Bounce", d = "Out", g = {Size = UDim2.new(0, 15,0, 15)}}):Play()
 						end)
 						Vanity.BackgroundColor3 = Color3.fromRGB(5, 120, 200)
 					end
@@ -1626,14 +1386,10 @@ function Library:CreateWindow(params)
 				OnChanged(Value)
 
 				local Titles = Raw.Text.Title
-				function selfs:SetTitle(a)
-					Titles.Text = a
-				end
+				function selfs:SetTitle(a) Titles.Text = a end
 				if Desc then
 					local Descs = Raw.Text.Desc
-					function selfs:SetDesc(a)
-						Descs.Text = a
-					end
+					function selfs:SetDesc(a) Descs.Text = a end
 				end
 				function selfs:ChangeValue(value)
 					Value = value
@@ -1646,9 +1402,9 @@ function Library:CreateWindow(params)
 			function Class:CreateButton(new)
 				local Title = new.Title
 				local Desc = new.Desc or nil
-				-- [SỬA] Xóa Icon
+				-- [MODIFIED] No Icon
 				local Raw = Library:Row(ScrollingPAGE_1, Title, Desc, 0.9, nil, nil)
-				local Callback = new.Callback or function() return end -- Sửa Call thành Callback
+				local Callback = new.Callback or function() return end
 
 				local Button = Instance.new("Frame")
 				local Asset_1 = Instance.new("ImageLabel")
@@ -1678,13 +1434,11 @@ function Library:CreateWindow(params)
 
 				Buttons.MouseButton1Click:Connect(function()
 					for _, v in pairs(Main_1:GetChildren()) do
-						if v.Name == "Dropdown" and v.Visible then
-							return
-						end
+						if v.Name == "Dropdown" and v.Visible then return end
 					end
-					Library:Tween({ v = Asset_1, t = 0.15, s = "Linear", d = "Out", g = {ImageTransparency = 0} }):Play()
+					Library:Tween({v = Asset_1, t = 0.15, s = "Linear", d = "Out", g = {ImageTransparency = 0}}):Play()
 					delay(0.15, function()
-						Library:Tween({ v = Asset_1, t = 0.2, s = "Linear", d = "Out", g = {ImageTransparency = 0.5} }):Play()
+						Library:Tween({v = Asset_1, t = 0.2, s = "Linear", d = "Out", g = {ImageTransparency = 0.5}}):Play()
 					end)
 					Library:Effect(Buttons, Raw)
 					Callback()
@@ -1692,26 +1446,20 @@ function Library:CreateWindow(params)
 
 				local Titles = Raw.Text.Title
 				local selfs = {}
-				function selfs:SetTitle(a)
-					Titles.Text = a
-				end
+				function selfs:SetTitle(a) Titles.Text = a end
 				if Desc then
 					local Descs = Raw.Text.Desc
-					function selfs:SetDesc(a)
-						Descs.Text = a
-					end
+					function selfs:SetDesc(a) Descs.Text = a end
 				end
-				function selfs:Fire()
-					Callback()
-				end
+				function selfs:Fire() Callback() end
 				return selfs
 			end
 
 			function Class:CreateTextfield(new)
 				local Title = new.Title
 				local Desc = new.Desc or nil
-				-- [SỬA] Xóa Icon
-				local Value = new.Default or "..." -- Sửa Value thành Default
+				-- [MODIFIED] No Icon
+				local Value = new.Default or "..."
 				local Raw = Library:Row(ScrollingPAGE_1, Title, Desc, 0.55, nil, nil)
 				local Callback = new.Callback or function() return end
 
@@ -1801,14 +1549,10 @@ function Library:CreateWindow(params)
 
 				local Titles = Raw.Text.Title
 				local selfs = {}
-				function selfs:SetTitle(a)
-					Titles.Text = a
-				end
+				function selfs:SetTitle(a) Titles.Text = a end
 				if Desc then
 					local Descs = Raw.Text.Desc
-					function selfs:SetDesc(a)
-						Descs.Text = a
-					end
+					function selfs:SetDesc(a) Descs.Text = a end
 				end
 				function selfs:ChangeValue(value)
 					TextBox_1.Text = value
@@ -1820,7 +1564,7 @@ function Library:CreateWindow(params)
 
 			function Class:CreateDropdown(new)
 				local Title = new.Title or "Dropdown"
-				-- [SỬA] Xóa Icon
+				-- [MODIFIED] No Icon
 				local List = new.List or {}
 				local Value = new.Default or "N/A"
 				local Primary = new.Type or "Single"
@@ -1876,7 +1620,6 @@ function Library:CreateWindow(params)
 				HeadOption.BorderSizePixel = 0
 				HeadOption.Size = UDim2.new(1, 0,0, 60)
 
-				-- [Phần Dropdown Page Frame, Title, Desc, Search, Refresh, Clear, Back... giữ nguyên]
 				local PageFrame = Instance.new("Frame")
 				local PageTitle_1 = Instance.new("Frame")
 				local UIListLayout_1 = Instance.new("UIListLayout")
@@ -2134,9 +1877,7 @@ function Library:CreateWindow(params)
 
 				local function OnBack()
 					for _, v in pairs(Page_1:GetChildren()) do
-						if v.Name == 'AddPage' or v.Name == 'AddDropdown' then
-							v.Visible = false
-						end
+						if v.Name == 'AddPage' or v.Name == 'AddDropdown' then v.Visible = false end
 					end
 					AddPage.Visible = true
 					UIPageLayout_1:JumpTo(AddPage)
@@ -2144,9 +1885,7 @@ function Library:CreateWindow(params)
 
 				local function OnLanding()
 					for _, v in pairs(Page_1:GetChildren()) do
-						if v.Name == 'AddPage' or v.Name == 'AddDropdown' then
-							v.Visible = false
-						end
+						if v.Name == 'AddPage' or v.Name == 'AddDropdown' then v.Visible = false end
 					end
 					AddDropdown.Visible = true
 					UIPageLayout_1:JumpTo(AddDropdown)
@@ -2229,12 +1968,10 @@ function Library:CreateWindow(params)
 
 				UIListLayout_1.Parent = DropdownScrolling
 				UIPadding_1.Parent = DropdownScrolling
-
 				UIPadding_1.PaddingBottom = UDim.new(0,1)
 				UIPadding_1.PaddingLeft = UDim.new(0,1)
 				UIPadding_1.PaddingRight = UDim.new(0,1)
 				UIPadding_1.PaddingTop = UDim.new(0,1)
-
 				UIListLayout_1.Padding = UDim.new(0,5)
 
 				Search_1.Changed:Connect(function()
@@ -2252,19 +1989,12 @@ function Library:CreateWindow(params)
 				end)
 
 				local function isValueInTable(val, tbl)
-					if type(tbl) ~= "table" then
-						return false
-					end
-					for _, v in pairs(tbl) do
-						if v == val then
-							return true
-						end
-					end
+					if type(tbl) ~= "table" then return false end
+					for _, v in pairs(tbl) do if v == val then return true end end
 					return false
 				end
 
 				local itemslist = {}
-
 				if Primary == 'Single' then
 					UIListLayout_1.SortOrder = Enum.SortOrder.LayoutOrder
 				elseif Primary == 'Double' then
@@ -2278,23 +2008,15 @@ function Library:CreateWindow(params)
 				end
 
 				local selectedItem
-
 				function itemslist:Clear(a)
 					local function shouldClear(v)
-						if a == nil then
-							return true
-						elseif type(a) == "string" then
-							return v.PaddingFrame.Text.Title.Text == a
+						if a == nil then return true
+						elseif type(a) == "string" then return v.PaddingFrame.Text.Title.Text == a
 						elseif type(a) == "table" then
-							for _, name in ipairs(a) do
-								if v.PaddingFrame.Text.Title.Text == name then
-									return true
-								end
-							end
+							for _, name in ipairs(a) do if v.PaddingFrame.Text.Title.Text == name then return true end end
 						end
 						return false
 					end
-
 					for _, v in ipairs(DropdownScrolling:GetChildren()) do
 						if v:IsA("Frame") and shouldClear(v) then
 							if selectedItem and v.PaddingFrame.Text.Title.Text == selectedItem then
@@ -2304,30 +2026,17 @@ function Library:CreateWindow(params)
 							v:Destroy()
 						end
 					end
-
-					if selectedItem == a or TextData.OnRaw.Text == a then
-						selectedItem = nil
-						SetDesc('N/A')
-					end
-
-					if a == nil then
-						selectedItem = nil
-						SetDesc('N/A')
-					end
+					if selectedItem == a or TextData.OnRaw.Text == a then selectedItem = nil; SetDesc('N/A') end
+					if a == nil then selectedItem = nil; SetDesc('N/A') end
 				end
 
 				local selectedValues = {}
-
 				function itemslist:AddList(tables)
-					local Title
-					local Icon
-
+					local Title; local Icon
 					if typeof(tables) == 'string' then
-						Title = tables
-						Icon = nil
+						Title = tables; Icon = nil
 					else
-						Title = tables.Title or "Unknow"
-						Icon = tables.Icon or nil
+						Title = tables.Title or "Unknow"; Icon = tables.Icon or nil
 					end
 
 					local Rows = Instance.new("Frame")
@@ -2458,7 +2167,6 @@ function Library:CreateWindow(params)
 					UIPadding_2.PaddingLeft = UDim.new(0,5)
 
 					if Icon then
-						-- [SỬA] Sử dụng Library:SetImage
 						Library:SetImage(asset_1, Icon)
 						AssetFrame_1.Visible = true
 						UIPadding_1.PaddingLeft = UDim.new(0,50)
@@ -2509,24 +2217,11 @@ function Library:CreateWindow(params)
 
 					local function OnSelected()
 						if Multi then
-							if selectedValues[Title] then
-								selectedValues[Title] = nil
-								Changed(false)
-							else
-								selectedValues[Title] = true
-								Changed(true)
-							end
+							if selectedValues[Title] then selectedValues[Title] = nil; Changed(false)
+							else selectedValues[Title] = true; Changed(true) end
 							local selectedList = {}
-							for i, v in pairs(selectedValues) do
-								table.insert(selectedList, i)
-							end
-							if #selectedList > 0 then
-								table.sort(selectedList)
-								Value = selectedList
-								UpdateText()
-							else
-								SetDesc('N/A')
-							end
+							for i, v in pairs(selectedValues) do table.insert(selectedList, i) end
+							if #selectedList > 0 then table.sort(selectedList); Value = selectedList; UpdateText() else SetDesc('N/A') end
 							pcall(Call, selectedList)
 							ElementSignal.OnValueChanged:Fire(selectedList)
 						else
@@ -2537,9 +2232,7 @@ function Library:CreateWindow(params)
 									Library:Tween({v = v.PaddingFrame.Text.Desc, t = 0.3, s = "Exponential", d = "Out", g = {TextTransparency = 0.75}}):Play()
 									Library:Tween({v = v.SelectEffect, t = 0.3, s = "Exponential", d = "Out", g = {ImageTransparency = 1}}):Play()
 									v.UIStroke.Color = Color3.fromRGB(55, 56, 58)
-									if v.AssetFrame.Visible then
-										Library:Tween({v = v.AssetFrame.asset, t = 0.3, s = "Exponential", d = "Out", g = {ImageTransparency = 0.5}}):Play()
-									end
+									if v.AssetFrame.Visible then Library:Tween({v = v.AssetFrame.asset, t = 0.3, s = "Exponential", d = "Out", g = {ImageTransparency = 0.5}}):Play() end
 									v.PaddingFrame.Text.Desc.Text = "Not Select"
 								end
 							end
@@ -2557,38 +2250,19 @@ function Library:CreateWindow(params)
 								selectedValues[Title] = true
 								Changed(true)
 								local selectedList = {}
-								for Title, v in pairs(selectedValues) do
-									table.insert(selectedList, Title)
-								end
-								if #selectedList > 0 then
-									UpdateText()
-								else
-									SetDesc('N/A')
-								end
+								for Title, v in pairs(selectedValues) do table.insert(selectedList, Title) end
+								if #selectedList > 0 then UpdateText() else SetDesc('N/A') end
 								pcall(Call, selectedList)
 								ElementSignal.OnValueChanged:Fire(selectedList)
 							end
 						else
-							if Title == Value then
-								Value = Title
-								Changed(true)
-								UpdateText()
-								pcall(Call, Value)
-								ElementSignal.OnValueChanged:Fire(Value)
-							end
+							if Title == Value then Value = Title; Changed(true); UpdateText(); pcall(Call, Value); ElementSignal.OnValueChanged:Fire(Value) end
 						end
 					end)
-
 					ClickRows.MouseButton1Click:Connect(OnSelected)
 				end
 
-				if Multi then
-					Clear.Visible = true
-					All.Visible = true
-				else
-					Clear.Visible = false
-					All.Visible = false
-				end
+				if Multi then Clear.Visible = true; All.Visible = true else Clear.Visible = false; All.Visible = false end
 
 				if Multi then
 					ClickClear.MouseButton1Click:Connect(function()
@@ -2597,93 +2271,53 @@ function Library:CreateWindow(params)
 							if v:IsA("Frame") then
 								local TextFrame = v:FindFirstChild("PaddingFrame") and v.PaddingFrame:FindFirstChild("Text")
 								if not TextFrame then continue end
-								local TitleLabel = TextFrame:FindFirstChild("Title")
-								local DescLabel = TextFrame:FindFirstChild("Desc")
-								local SelectEffect = v:FindFirstChild("SelectEffect")
-								local Stroke = v:FindFirstChildOfClass("UIStroke")
+								local TitleLabel = TextFrame:FindFirstChild("Title"); local DescLabel = TextFrame:FindFirstChild("Desc")
+								local SelectEffect = v:FindFirstChild("SelectEffect"); local Stroke = v:FindFirstChildOfClass("UIStroke")
 								local assetFrame = v:FindFirstChild("AssetFrame")
 								if TitleLabel then Library:Tween({v = TitleLabel, t = 0.3, s = "Exponential", d = "Out", g = { TextTransparency = 0.5 }}):Play() end
-								if DescLabel then
-									DescLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-									Library:Tween({v = DescLabel, t = 0.3, s = "Exponential", d = "Out", g = { TextTransparency = 0.75 }}):Play()
-									DescLabel.Text = Advance['Not Select']
-								end
+								if DescLabel then DescLabel.TextColor3 = Color3.fromRGB(255, 255, 255); Library:Tween({v = DescLabel, t = 0.3, s = "Exponential", d = "Out", g = { TextTransparency = 0.75 }}):Play(); DescLabel.Text = Advance['Not Select'] end
 								if SelectEffect then Library:Tween({v = SelectEffect, t = 0.3, s = "Exponential", d = "Out", g = { ImageTransparency = 1 }}):Play() end
 								if Stroke then Stroke.Color = Color3.fromRGB(55, 56, 58) end
-								if assetFrame and assetFrame.Visible then
-									local asset = assetFrame:FindFirstChild("asset")
-									if asset then Library:Tween({v = asset, t = 0.3, s = "Exponential", d = "Out", g = { ImageTransparency = 0.5 }}):Play() end
-								end
+								if assetFrame and assetFrame.Visible then local asset = assetFrame:FindFirstChild("asset"); if asset then Library:Tween({v = asset, t = 0.3, s = "Exponential", d = "Out", g = { ImageTransparency = 0.5 }}):Play() end end
 							end
 						end
-						Value = {}
-						UpdateText()
-						SetDesc("N/A")
-						pcall(Call, Value)
+						Value = {}; UpdateText(); SetDesc("N/A"); pcall(Call, Value)
 					end)
-
 					ClickAll.MouseButton1Click:Connect(function()
 						table.clear(selectedValues)
 						for _, v in ipairs(DropdownScrolling:GetChildren()) do
 							if v:IsA("Frame") then
 								local TextFrame = v:FindFirstChild("PaddingFrame") and v.PaddingFrame:FindFirstChild("Text")
 								if not TextFrame then continue end
-								local TitleLabel = TextFrame:FindFirstChild("Title")
-								local DescLabel = TextFrame:FindFirstChild("Desc")
-								local SelectEffect = v:FindFirstChild("SelectEffect")
-								local Stroke = v:FindFirstChildOfClass("UIStroke")
+								local TitleLabel = TextFrame:FindFirstChild("Title"); local DescLabel = TextFrame:FindFirstChild("Desc")
+								local SelectEffect = v:FindFirstChild("SelectEffect"); local Stroke = v:FindFirstChildOfClass("UIStroke")
 								local assetFrame = v:FindFirstChild("AssetFrame")
 								local titleName = TitleLabel and TitleLabel.Text or nil
 								if titleName then selectedValues[titleName] = true end
 								if TitleLabel then Library:Tween({v = TitleLabel, t = 0.3, s = "Exponential", d = "Out", g = { TextTransparency = 0 }}):Play() end
-								if DescLabel then
-									DescLabel.TextColor3 = Color3.fromRGB(85, 170, 255)
-									Library:Tween({v = DescLabel, t = 0.3, s = "Exponential", d = "Out", g = { TextTransparency = 0 }}):Play()
-									DescLabel.Text = Advance['Select']
-								end
+								if DescLabel then DescLabel.TextColor3 = Color3.fromRGB(85, 170, 255); Library:Tween({v = DescLabel, t = 0.3, s = "Exponential", d = "Out", g = { TextTransparency = 0 }}):Play(); DescLabel.Text = Advance['Select'] end
 								if SelectEffect then Library:Tween({v = SelectEffect, t = 0.3, s = "Exponential", d = "Out", g = { ImageTransparency = 0.5 }}):Play() end
 								if Stroke then Stroke.Color = Color3.fromRGB(0, 170, 255) end
-								if assetFrame and assetFrame.Visible then
-									local asset = assetFrame:FindFirstChild("asset")
-									if asset then Library:Tween({v = asset, t = 0.3, s = "Exponential", d = "Out", g = { ImageTransparency = 0 }}):Play() end
-								end
+								if assetFrame and assetFrame.Visible then local asset = assetFrame:FindFirstChild("asset"); if asset then Library:Tween({v = asset, t = 0.3, s = "Exponential", d = "Out", g = { ImageTransparency = 0 }}):Play() end end
 							end
 						end
-						local selectedList = {}
-						for name in pairs(selectedValues) do table.insert(selectedList, name) end
-						Value = selectedList
-						selectedValues = selectedList
-						UpdateText()
-						pcall(Call, Value)
-						ElementSignal.OnValueChanged:Fire(selectedList)
+						local selectedList = {}; for name in pairs(selectedValues) do table.insert(selectedList, name) end
+						Value = selectedList; selectedValues = selectedList; UpdateText(); pcall(Call, Value); ElementSignal.OnValueChanged:Fire(selectedList)
 					end)
 				end
 
 				ClickRefresh.MouseButton1Click:Connect(function()
 					itemslist:Clear()
-					if Multi then
-						selectedValues = {}
-						Value = selectedValues
-					else
-						UpdateText()
-						SetDesc('N/A')
-						Value = Title
-					end
+					if Multi then selectedValues = {}; Value = selectedValues else UpdateText(); SetDesc('N/A'); Value = Title end
 					ElementSignal.OnRefresh:Fire(itemslist)
 				end)
 
-				for _, name in ipairs(List) do
-					itemslist:AddList(name)
-				end
-
+				for _, name in ipairs(List) do itemslist:AddList(name) end
 				itemslist.OnValueChanged = ElementSignal.OnValueChanged
 				itemslist.OnRefresh = ElementSignal.OnRefresh
-
 				local Titles = Raw.Text.Title
 				local selfs = {}
-				function selfs:SetTitle(a)
-					Titles.Text = a
-				end
+				function selfs:SetTitle(a) Titles.Text = a end
 				if Icon then
 					function selfs:SetIcon(a)
 						local _Icon = Raw.Parent.AssetFrame.asset
@@ -2696,14 +2330,15 @@ function Library:CreateWindow(params)
 				return itemslist
 			end
 
-			function Class:CreateSlider(new)
+				
+                function Class:CreateSlider(new)
 				local Title = new.Title
 				local Desc = new.Desc or nil
 				local Value = new.Value or ""
 				local Min = new.Min or 1
 				local Max = new.Max or 10
-				-- [SỬA] Xóa Icon
 				local Rounding = new.Rounding or 0
+				-- [MODIFIED] No Icon
 				local Raw = Library:Row(ScrollingPAGE_1, Title, Desc, 0.475, nil, nil)
 				local Callback = new.Callback or function() return end
 
@@ -2832,21 +2467,32 @@ function Library:CreateWindow(params)
 							return
 						end
 					end
+
 					value = math.clamp(value, Min, Max)
 					value = roundToDecimal(value, Rounding)
+
 					Library:Tween({
-						v = Color_1, t = 0.15, s = "Exponential", d = "Out", g = {Size = UDim2.new((value - Min) / (Max - Min), 0, 1, 0)}
+						v = Color_1,
+						t = 0.15,
+						s = "Exponential",
+						d = "Out",
+						g = {Size = UDim2.new((value - Min) / (Max - Min), 0, 1, 0)}
 					}):Play()
+
 					local startValue = tonumber(TextBox_1.Text) or 0
 					local targetValue = value
+
 					local steps = 5
 					local currentValue = startValue
+
 					for i = 1, steps do
 						task.wait(0.01 / steps)
 						currentValue = currentValue + (targetValue - startValue) / steps
 						TextBox_1.Text = tostring(roundToDecimal(currentValue, Rounding))
 					end
+
 					TextBox_1.Text = tostring(roundToDecimal(targetValue, Rounding))
+
 					Callback(value)
 					ElementSignal:Fire(value)
 				end
@@ -2857,16 +2503,19 @@ function Library:CreateWindow(params)
 					local sliderBar = Slider_1
 					local relativeX = math.clamp((input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X, 0, 1)
 					local value = relativeX * (Max - Min) + Min
+
 					updateSlider(value)
 				end
 
 				TextBox_1.FocusLost:Connect(function()
 					local value = tonumber(TextBox_1.Text) or Min
+
 					updateSlider(value)
 					ElementSignal:Fire(value)
 				end)
 
 				local dragging = false
+
 				Slide.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = true
@@ -2874,11 +2523,13 @@ function Library:CreateWindow(params)
 						move(input)
 					end
 				end)
+
 				UserInputService.InputChanged:Connect(function(input)
 					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 						move(input)
 					end
 				end)
+
 				UserInputService.InputEnded:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						if dragging then
@@ -2889,25 +2540,595 @@ function Library:CreateWindow(params)
 				end)
 
 				local Titles = Raw.Text.Title
+
 				function selfs:SetTitle(a)
 					Titles.Text = a
 				end
+
 				if Desc then
 					local Descs = Raw.Text.Desc
+
 					function selfs:SetDesc(a)
 						Descs.Text = a
 					end
 				end
-				function selfs:ChangeValue(value)
+	        
+	            function selfs:ChangeValue(value)
 					Value = value
 					updateSlider(Value)
 					ElementSignal:Fire(value)
 				end
+
 				return selfs
+			end
+			
+            -- [COLOR PICKER - V6 FINAL: SMART POSITION & TOUCH FIX]
+            function Class:CreateColorPicker(new)
+                local Title = new.Title or "Color Picker"
+                local Desc = new.Desc or nil
+                local Default = new.Default or Color3.fromRGB(255, 255, 255)
+                local Callback = new.Callback or function() end
+                
+                -- [1] Row VS Code Style
+                local Raw = Library:Row(ScrollingPAGE_1, Title, Desc, 0.475, nil, nil)
+                
+                local selfs = {}
+                local ElementSignal = Signal.new()
+                selfs.OnValueChanged = ElementSignal
+
+                -- State
+                local ColorH, ColorS, ColorV = Default:ToHSV()
+                local CurrentColor = Default
+                local IsDraggingSV, IsDraggingHue = false, false
+                local DraggingInput = nil -- Lưu InputObject để tracking chính xác
+
+                -- [2] Nút Preview
+                local ColorPreview = Instance.new("TextButton")
+                local PreviewCorner = Instance.new("UICorner")
+                local PreviewStroke = Instance.new("UIStroke")
+                
+                ColorPreview.Name = "ColorPreview"
+                ColorPreview.Parent = Raw
+                ColorPreview.AnchorPoint = Vector2.new(1, 0.5)
+                ColorPreview.Position = UDim2.new(1, -20, 0.5, 0)
+                ColorPreview.Size = UDim2.new(0, 40, 0, 20)
+                ColorPreview.BackgroundColor3 = Default
+                ColorPreview.Text = ""
+                ColorPreview.AutoButtonColor = false
+                ColorPreview.ZIndex = 2
+
+                PreviewCorner.CornerRadius = UDim.new(0, 4)
+                PreviewCorner.Parent = ColorPreview
+
+                PreviewStroke.Color = Color3.fromRGB(60, 60, 60)
+                PreviewStroke.Thickness = 1
+                PreviewStroke.Parent = ColorPreview
+
+                -- [3] Picker Frame (Smart Popup)
+                local PickerFrame = Instance.new("Frame")
+                local PickerCorner = Instance.new("UICorner")
+                local PickerStroke = Instance.new("UIStroke")
+                local PickerPadding = Instance.new("UIPadding")
+                
+                PickerFrame.Name = "PickerFrame"
+                PickerFrame.Parent = Main_1 -- Gắn vào Main để không bị cắt bởi list
+                PickerFrame.Size = UDim2.new(0, 400, 0, 200) 
+                PickerFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+                PickerFrame.Visible = false
+                PickerFrame.ZIndex = 200
+                PickerFrame.ClipsDescendants = true
+
+                PickerCorner.CornerRadius = UDim.new(0, 8)
+                PickerCorner.Parent = PickerFrame
+
+                PickerStroke.Color = Color3.fromRGB(50, 50, 50)
+                PickerStroke.Thickness = 1
+                PickerStroke.Parent = PickerFrame
+
+                PickerPadding.PaddingTop = UDim.new(0, 15)
+                PickerPadding.PaddingBottom = UDim.new(0, 15)
+                PickerPadding.PaddingLeft = UDim.new(0, 15)
+                PickerPadding.PaddingRight = UDim.new(0, 15)
+                PickerPadding.Parent = PickerFrame
+
+                -- [4] Layout Rayfield
+                local LeftSide = Instance.new("Frame")
+                LeftSide.Parent = PickerFrame
+                LeftSide.Size = UDim2.new(0.45, 0, 1, 0)
+                LeftSide.BackgroundTransparency = 1
+                LeftSide.ZIndex = 201
+
+                local LabelTitle = Instance.new("TextLabel")
+                LabelTitle.Parent = LeftSide
+                LabelTitle.Size = UDim2.new(1, 0, 0, 20)
+                LabelTitle.BackgroundTransparency = 1
+                LabelTitle.Text = "Color Picker"
+                LabelTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+                LabelTitle.Font = Enum.Font.GothamBold
+                LabelTitle.TextSize = 16
+                LabelTitle.TextXAlignment = Enum.TextXAlignment.Left
+                LabelTitle.ZIndex = 201
+
+                local function CreateDisplayBox(parent, pos, size, text)
+                    local Box = Instance.new("TextButton")
+                    Box.Parent = parent
+                    Box.Position = pos
+                    Box.Size = size
+                    Box.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    Box.Text = text
+                    Box.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    Box.Font = Enum.Font.Gotham
+                    Box.TextSize = 12
+                    Box.AutoButtonColor = false
+                    Box.ZIndex = 202
+                    local C = Instance.new("UICorner", Box); C.CornerRadius = UDim.new(0, 6)
+                    local S = Instance.new("UIStroke", Box); S.Color = Color3.fromRGB(40, 40, 40); S.Thickness = 1
+                    return Box
+                end
+
+                local RBox = CreateDisplayBox(LeftSide, UDim2.new(0, 0, 0, 35), UDim2.new(0.3, -5, 0, 30), "255")
+                local GBox = CreateDisplayBox(LeftSide, UDim2.new(0.33, 0, 0, 35), UDim2.new(0.3, -5, 0, 30), "255")
+                local BBox = CreateDisplayBox(LeftSide, UDim2.new(0.66, 0, 0, 35), UDim2.new(0.3, -5, 0, 30), "255")
+                local HexBox = CreateDisplayBox(LeftSide, UDim2.new(0, 0, 0, 75), UDim2.new(1, 0, 0, 30), "#FFFFFF")
+                
+                local CancelBtn = Instance.new("TextButton")
+                CancelBtn.Parent = LeftSide
+                CancelBtn.Size = UDim2.new(1, 0, 0, 25)
+                CancelBtn.Position = UDim2.new(0, 0, 1, -25) -- Cạnh đáy
+                CancelBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45) -- Màu xám tối
+                CancelBtn.Text = "Cancel"
+                CancelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                CancelBtn.Font = Enum.Font.GothamBold
+                CancelBtn.TextSize = 12
+                CancelBtn.ZIndex = 202
+                
+                local CancelCorner = Instance.new("UICorner", CancelBtn); CancelCorner.CornerRadius = UDim.new(0, 6)
+                local CancelStroke = Instance.new("UIStroke", CancelBtn); CancelStroke.Color = Color3.fromRGB(60,60,60); CancelStroke.Thickness = 1
+
+                -- Logic đóng Popup cho nút Cancel
+                CancelBtn.MouseButton1Click:Connect(function()
+                    PickerFrame.Visible = false
+                end)
+
+                -- Hover effect cho nút Cancel
+                CancelBtn.MouseEnter:Connect(function() CancelBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end)
+                CancelBtn.MouseLeave:Connect(function() CancelBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45) end)
+                
+                local RightSide = Instance.new("Frame")
+                RightSide.Parent = PickerFrame
+                RightSide.Size = UDim2.new(0.5, 0, 1, 0)
+                RightSide.Position = UDim2.new(0.5, 0, 0, 0)
+                RightSide.BackgroundTransparency = 1
+                RightSide.ZIndex = 201
+
+                local SVImage = Instance.new("ImageButton")
+                SVImage.Parent = RightSide
+                SVImage.Size = UDim2.new(1, 0, 1, -25)
+                SVImage.BackgroundColor3 = Color3.fromHSV(ColorH, 1, 1)
+                SVImage.Image = "rbxassetid://4155801252"
+                SVImage.AutoButtonColor = false
+                SVImage.ZIndex = 202
+                Instance.new("UICorner", SVImage).CornerRadius = UDim.new(0, 6)
+
+                local SVCursor = Instance.new("Frame")
+                SVCursor.Parent = SVImage
+                SVCursor.Size = UDim2.new(0, 10, 0, 10)
+                SVCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+                SVCursor.BackgroundColor3 = Default
+                SVCursor.Position = UDim2.new(ColorS, 0, 1 - ColorV, 0)
+                SVCursor.ZIndex = 203
+                Instance.new("UICorner", SVCursor).CornerRadius = UDim.new(1, 0)
+                local SVStroke = Instance.new("UIStroke", SVCursor); SVStroke.Color = Color3.new(1,1,1); SVStroke.Thickness = 1.5
+
+                local HueImage = Instance.new("ImageButton")
+                HueImage.Parent = RightSide
+                HueImage.Size = UDim2.new(1, 0, 0, 15)
+                HueImage.Position = UDim2.new(0, 0, 1, -15)
+                HueImage.BackgroundColor3 = Color3.new(1,1,1)
+                HueImage.Image = ""
+                HueImage.AutoButtonColor = false
+                HueImage.ZIndex = 202
+                Instance.new("UICorner", HueImage).CornerRadius = UDim.new(0, 6)
+
+                local UIGradient = Instance.new("UIGradient")
+                UIGradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
+                    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0))
+                })
+                UIGradient.Parent = HueImage
+
+                local HueCursor = Instance.new("Frame")
+                HueCursor.Parent = HueImage
+                HueCursor.Size = UDim2.new(0, 4, 1, 0)
+                HueCursor.BackgroundColor3 = Color3.new(1,1,1)
+                HueCursor.Position = UDim2.new(1 - ColorH, 0, 0, 0)
+                HueCursor.AnchorPoint = Vector2.new(0.5, 0)
+                HueCursor.ZIndex = 203
+                Instance.new("UICorner", HueCursor).CornerRadius = UDim.new(0, 2)
+                local HueStroke = Instance.new("UIStroke", HueCursor); HueStroke.Color = Color3.new(0,0,0); HueStroke.Thickness = 1
+
+                -- [LOGIC UPDATE]
+                local function UpdateColor()
+                    CurrentColor = Color3.fromHSV(ColorH, ColorS, ColorV)
+                    ColorPreview.BackgroundColor3 = CurrentColor
+                    SVImage.BackgroundColor3 = Color3.fromHSV(ColorH, 1, 1)
+                    SVCursor.BackgroundColor3 = CurrentColor
+                    RBox.Text = math.floor(CurrentColor.R * 255)
+                    GBox.Text = math.floor(CurrentColor.G * 255)
+                    BBox.Text = math.floor(CurrentColor.B * 255)
+                    HexBox.Text = "#" .. CurrentColor:ToHex()
+                    pcall(Callback, CurrentColor)
+                    ElementSignal:Fire(CurrentColor)
+                end
+
+                local function UpdatePickerPosition()
+                    if not PickerFrame.Visible then return end
+                    if not Main_1 or not Main_1:IsDescendantOf(game) then return end
+
+                  -- Neo popup vào giữa
+                PickerFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+                  -- Đặt ở giữa Main_1
+                PickerFrame.Position = UDim2.new(
+                      0.5, 0,    -- giữa theo trục X
+                      0.5, 0     -- giữa theo trục Y
+               )
+end
+
+                -- Animation
+                local ElementsToAnimate = {LeftSide, RightSide}
+                local OriginalPositions = {}
+                for i, v in ipairs(ElementsToAnimate) do OriginalPositions[v] = v.Position end
+
+                local function AnimateOpen()
+                    UpdatePickerPosition() -- Tính toán vị trí trước khi hiện
+                    
+                    PickerFrame.Size = UDim2.new(0, 0, 0, 0)
+                    PickerFrame.Visible = true
+                    TweenService:Create(PickerFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                        Size = UDim2.new(0, 400, 0, 200)
+                    }):Play()
+
+                    for _, frame in ipairs(ElementsToAnimate) do
+                        frame.Position = OriginalPositions[frame] + UDim2.new(0, 0, 0, 50)
+                        frame.BackgroundTransparency = 1 
+                        TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                            Position = OriginalPositions[frame],
+                            BackgroundTransparency = 1
+                        }):Play()
+                    end
+                end
+
+                -- [FIX TOUCH CHÍNH XÁC]
+                -- Sử dụng InputObject trực tiếp thay vì GetMouseLocation toàn cục
+                local function HandleInput()
+                    if not DraggingInput then return end
+                    
+                    local InputPos = DraggingInput.Position -- Vị trí ngón tay chính xác
+                    
+                    if IsDraggingSV then
+                        local AbsPos = SVImage.AbsolutePosition
+                        local AbsSize = SVImage.AbsoluteSize
+                        
+                        local X = math.clamp((InputPos.X - AbsPos.X) / AbsSize.X, 0, 1)
+                        local Y = math.clamp((InputPos.Y - AbsPos.Y) / AbsSize.Y, 0, 1)
+                        
+                        SVCursor.Position = UDim2.new(X, 0, Y, 0)
+                        ColorS = X; ColorV = 1 - Y
+                        UpdateColor()
+                    elseif IsDraggingHue then
+                        local AbsPos = HueImage.AbsolutePosition
+                        local AbsSize = HueImage.AbsoluteSize
+                        
+                        local X = math.clamp((InputPos.X - AbsPos.X) / AbsSize.X, 0, 1)
+                        
+                        HueCursor.Position = UDim2.new(X, 0, 0, 0)
+                        ColorH = 1 - X 
+                        UpdateColor()
+                    end
+                end
+
+                SVImage.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        DraggingInput = input -- Lưu input object
+                        IsDraggingSV = true
+                        HandleInput()
+                    end
+                end)
+                
+                HueImage.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        DraggingInput = input -- Lưu input object
+                        IsDraggingHue = true
+                        HandleInput()
+                    end
+                end)
+
+                UserInputService.InputEnded:Connect(function(input)
+                    if input == DraggingInput then -- Chỉ dừng khi đúng ngón tay đó thả ra
+                        IsDraggingSV = false
+                        IsDraggingHue = false
+                        DraggingInput = nil
+                    end
+                end)
+                
+                -- InputChanged cho Mouse Movement (Touch tự cập nhật qua object reference)
+                UserInputService.InputChanged:Connect(function(input)
+                    if input == DraggingInput and input.UserInputType == Enum.UserInputType.MouseMovement then
+                        HandleInput()
+                    end
+                end)
+
+                -- RenderStepped: Chỉ dùng để update vị trí popup và tracking touch liên tục
+                RunService.RenderStepped:Connect(function()
+                    if PickerFrame.Visible then
+                        if IsDraggingSV or IsDraggingHue then 
+                            -- Với Touch, position của DraggingInput tự update, ta cần gọi lại HandleInput
+                            HandleInput() 
+                        end
+                        UpdatePickerPosition() -- Bám dính nút khi scroll
+                    end
+                end)
+
+                ColorPreview.MouseButton1Click:Connect(function()
+                    if PickerFrame.Visible then
+                        PickerFrame.Visible = false 
+                    else
+                        for _, v in pairs(Main_1:GetChildren()) do 
+                            if v.Name == "PickerFrame" then v.Visible = false end 
+                        end
+                        AnimateOpen()
+                    end
+                end)
+
+                local Titles = Raw.Text.Title
+                function selfs:SetTitle(t) Titles.Text = t end
+                function selfs:SetValue(c)
+                    ColorH, ColorS, ColorV = c:ToHSV()
+                    SVCursor.Position = UDim2.new(ColorS, 0, 1-ColorV, 0)
+                    HueCursor.Position = UDim2.new(1-ColorH, 0, 0, 0)
+                    UpdateColor()
+                end
+                UpdateColor()
+
+                return selfs
+            end
+
+        local Theme = {
+            Background = Color3.fromRGB(30, 30, 30),     
+            Border     = Color3.fromRGB(0, 122, 204),    
+            Title      = Color3.fromRGB(255, 255, 255),   
+            Content    = Color3.fromRGB(204, 204, 204),   
+            Shadow     = Color3.fromRGB(0, 0, 0)          
+        }
+            local VsNotify= Instance.new("ScreenGui")
+            VsNotify.Name = "VSCodeNotify"
+
+            if RunService:IsStudio() then
+                VsNotify.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+            else
+    
+              local Success = pcall(function() VsNotify.Parent = CoreGui end)
+                   if not Success then VsNotify.Parent = Players.LocalPlayer:WaitForChild("PlayerGui") end
+            end
+
+            local NotifyHolder = Instance.new("Frame")
+            NotifyHolder.Name = "Holder"
+            NotifyHolder.Parent = VsNotify
+            NotifyHolder.BackgroundTransparency = 1
+            NotifyHolder.Position = UDim2.new(1, -20, 1, -20) 
+            NotifyHolder.AnchorPoint = Vector2.new(1, 1)
+            NotifyHolder.Size = UDim2.new(0, 300, 1, 0)
+            
+            local ListLayout = Instance.new("UIListLayout")
+            ListLayout.Parent = NotifyHolder
+            ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            ListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+            ListLayout.Padding = UDim.new(0, 10)
+            
+            function Library:CreateNotify(Config)
+            local TitleText = Config.Title or "Notification"
+            local ContentText = Config.Content or "No content provided."
+            local Duration = Config.Duration or 5
+            local IconName = Config.Image -- Có thể là ID số hoặc tên Lucide (vd: "check")
+
+ 
+               -- 1. Tạo Khung Thông Báo
+            local Frame = Instance.new("Frame")
+            Frame.Name = "NotifyFrame"
+            Frame.Parent = NotifyHolder
+            Frame.BackgroundColor3 = Theme.Background
+            Frame.BackgroundTransparency = 1 -- Bắt đầu trong suốt để animate
+            Frame.BorderSizePixel = 0
+            Frame.Size = UDim2.new(1, 0, 0, 0) -- Bắt đầu chiều cao 0
+            Frame.ClipsDescendants = true
+
+            local Corner = Instance.new("UICorner")
+            Corner.CornerRadius = UDim.new(0, 6)
+            Corner.Parent = Frame
+        
+            -- Viền (Stroke)
+            local Stroke = Instance.new("UIStroke")
+            Stroke.Parent = Frame
+            Stroke.Color = Theme.Border
+            Stroke.Thickness = 1
+            Stroke.Transparency = 1
+
+            -- 2. Các thành phần bên trong
+            local Container = Instance.new("Frame") -- Chứa nội dung để padding
+            Container.Name = "Container"
+            Container.Parent = Frame
+            Container.BackgroundTransparency = 1
+            Container.Size = UDim2.new(1, -20, 1, -10)
+            Container.Position = UDim2.new(0, 10, 0, 5)
+        
+             -- Icon
+            local IconLabel = Instance.new("ImageLabel")
+            IconLabel.Name = "Icon"
+            IconLabel.Parent = Container
+            IconLabel.BackgroundTransparency = 1
+            IconLabel.Size = UDim2.new(0, 24, 0, 24)
+            IconLabel.Position = UDim2.new(0, 0, 0, 5)
+            IconLabel.ImageColor3 = Theme.Title
+            IconLabel.ImageTransparency = 1
+    
+    -- Xử lý Icon
+            if IconName then
+                if type(IconName) == "string" and not tonumber(IconName) then
+                        -- Thử load Lucide
+                    task.spawn(function()
+                        local Attempt = 0
+                        while not Icons and Attempt < 10 do task.wait(0.1) Attempt = Attempt + 1 end
+                        local Lucide = GetIcon(IconName)
+                        if Lucide then
+                            IconLabel.Image = Lucide.ID
+                            IconLabel.ImageRectOffset = Lucide.RectOffset
+                            IconLabel.ImageRectSize = Lucide.RectSize
+                        end
+                    end)
+                else
+                    -- Là ID thường
+                    IconLabel.Image = "rbxassetid://" .. tostring(IconName)
+                end
+            else
+                -- Mặc định icon info nếu không có
+                IconLabel.Image = "rbxassetid://3944680095" 
+            end
+
+    -- Title
+            local TitleLabel = Instance.new("TextLabel")
+            TitleLabel.Parent = Container
+            TitleLabel.BackgroundTransparency = 1
+            TitleLabel.Position = UDim2.new(0, 32, 0, 5)
+            TitleLabel.Size = UDim2.new(1, -32, 0, 20)
+            TitleLabel.Font = Enum.Font.GothamBold
+            TitleLabel.Text = TitleText
+            TitleLabel.TextColor3 = Theme.Title
+            TitleLabel.TextSize = 14
+            TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+            TitleLabel.TextTransparency = 1
+        
+    -- Content
+            local ContentLabel = Instance.new("TextLabel")
+            ContentLabel.Parent = Container
+            ContentLabel.BackgroundTransparency = 1
+            ContentLabel.Position = UDim2.new(0, 32, 0, 25)
+            ContentLabel.Size = UDim2.new(1, -32, 0, 0) -- Height tự động
+            ContentLabel.AutomaticSize = Enum.AutomaticSize.Y
+            ContentLabel.Font = Enum.Font.Gotham
+            ContentLabel.Text = ContentText
+            ContentLabel.TextColor3 = Theme.Content
+            ContentLabel.TextSize = 12
+            ContentLabel.TextXAlignment = Enum.TextXAlignment.Left
+            ContentLabel.TextWrapped = true
+            ContentLabel.TextTransparency = 1
+
+    -- Thanh thời gian (ProgressBar)
+            local Bar = Instance.new("Frame")
+            Bar.Parent = Frame
+            Bar.BackgroundColor3 = Theme.Border
+            Bar.BorderSizePixel = 0
+            Bar.Position = UDim2.new(0, 0, 1, -2)
+            Bar.Size = UDim2.new(0, 0, 0, 2)
+            Bar.BackgroundTransparency = 1
+
+            -- 3. Tính toán chiều cao thực tế
+            local TextHeight = ContentLabel.TextBounds.Y
+            local TargetHeight = 40 + TextHeight + 10 -- Header + Text + Padding
+            if TargetHeight < 60 then TargetHeight = 60 end -- Min height
+
+    -- 4. ANIMATION (Slide In & Fade In)
+    
+    -- Bước 1: Mở rộng chiều cao
+            TweenService:Create(Frame, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, TargetHeight)}):Play()
+            task.wait(0.1)
+    
+    -- Bước 2: Hiện nội dung
+            TweenService:Create(Frame, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
+            TweenService:Create(Stroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
+            TweenService:Create(TitleLabel, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+            TweenService:Create(ContentLabel, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+            TweenService:Create(IconLabel, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
+            TweenService:Create(Bar, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+
+            -- Bước 3: Chạy thanh thời gian
+            TweenService:Create(Bar, TweenInfo.new(Duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 2)}):Play()
+
+            -- 5. Tự động đóng
+            task.delay(Duration, function()
+                -- Fade Out
+                TweenService:Create(Frame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+                TweenService:Create(Stroke, TweenInfo.new(0.3), {Transparency = 1}):Play()
+                TweenService:Create(TitleLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+                TweenService:Create(ContentLabel, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+                TweenService:Create(IconLabel, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
+                TweenService:Create(Bar, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+        
+                task.wait(0.1)
+                -- Thu nhỏ lại
+                local Shrink = TweenService:Create(Frame, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 0)})
+                Shrink:Play()
+                Shrink.Completed:Wait()
+                Frame:Destroy()
+            end)
+        end
+            
+            
+            
+            
+            
+
+
+
+			function Class:Banner(new)
+				local Banner = new.Banner or "rbxassetid://130155603088446"
+				local SizeY = new.Size or 200
+
+				local Rows = Instance.new("Frame")
+				local UICorner_1 = Instance.new("UICorner")
+				local UIStroke_1 = Instance.new("UIStroke")
+				local Banner_1 = Instance.new("ImageLabel")
+				local UIPadding_1 = Instance.new("UIPadding")
+
+				Rows.Name = "Rows"
+				Rows.Parent = ScrollingPAGE_1
+				Rows.AutomaticSize = Enum.AutomaticSize.Y
+				Rows.BackgroundColor3 = Color3.fromRGB(37,37,38)
+				Rows.BorderColor3 = Color3.fromRGB(0,0,0)
+				Rows.BorderSizePixel = 0
+				Rows.Size = UDim2.new(1, 0,0, 50)
+
+				UICorner_1.Parent = Rows
+				UICorner_1.CornerRadius = UDim.new(0,5)
+
+				UIStroke_1.Parent = Rows
+				UIStroke_1.Color = Color3.fromRGB(55,56,58)
+				UIStroke_1.Thickness = 0.75
+
+				Banner_1.Name = "Banner"
+				Banner_1.Parent = Rows
+				Banner_1.BackgroundColor3 = Color3.fromRGB(255,255,255)
+				Banner_1.BorderColor3 = Color3.fromRGB(0,0,0)
+				Banner_1.BorderSizePixel = 0
+				Banner_1.Size = UDim2.new(1, 0,0, SizeY)
+				
+				-- [MODIFIED] Set Banner Image with new helper
+				Library:SetImage(Banner_1, Banner)
+				Banner_1.ScaleType = Enum.ScaleType.Crop
+
+				UIPadding_1.Parent = Rows
+				UIPadding_1.PaddingBottom = UDim.new(0,10)
+				UIPadding_1.PaddingLeft = UDim.new(0,10)
+				UIPadding_1.PaddingRight = UDim.new(0,10)
+				UIPadding_1.PaddingTop = UDim.new(0,10)
 			end
 
 			function Class:List(new)
-				-- Tương tự CreateDropdown
 				return self:CreateDropdown(new)
 			end
 
@@ -2917,9 +3138,7 @@ function Library:CreateWindow(params)
 
 		function Element:Select()
 			for _, v in pairs(Page_1:GetChildren()) do
-				if v.Name == 'AddPage' then
-					v.Visible = false
-				end
+				if v.Name == 'AddPage' then v.Visible = false end
 			end
 			AddPage.Visible = true
 			UIPageLayout_1:JumpTo(AddPage)
